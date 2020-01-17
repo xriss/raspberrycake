@@ -1,0 +1,17 @@
+cd `dirname $0`
+. ./box-settings
+
+echo " running ${PHANTOM_OUTPUT} using qemu "
+echo " you can no longer use this shell "
+
+
+echo " replacing fstab for qemu "
+
+./box-mount
+
+sudo cp root/etc/fstab.qemu         root/etc/fstab
+
+./box-umount
+
+
+qemu-system-arm -kernel kernel-qemu -cpu arm1176 -m 256 -M versatilepb -no-reboot -append "root=/dev/sda2 panic=1 console=ttyAMA0" -drive file=${PHANTOM_OUTPUT},index=0,media=disk,format=raw -net nic -net user,hostfwd=tcp::5522-:22 -nographic

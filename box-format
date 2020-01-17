@@ -1,0 +1,140 @@
+cd `dirname $0`
+. ./box-settings
+THISDIR=`dirname $0`
+
+#update these to get a newer version
+RASPBIAN_FILE=2019-04-08-raspbian-stretch-lite
+RASPBIAN_URL=https://downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-04-09/$RASPBIAN_FILE.zip
+
+
+if [ -f raspbian.img ] ; then
+
+	echo " raspbian.img exists so skipping download and unpack "
+
+else
+
+	wget -O $RASPBIAN_FILE.zip $RASPBIAN_URL
+	unzip -o $RASPBIAN_FILE.zip
+	rm $RASPBIAN_FILE.zip
+	mv $RASPBIAN_FILE.img raspbian.img
+
+fi
+
+
+
+
+if [ -f kernel-qemu ] ; then
+
+	echo " kernel-qemu exists so skipping download "
+
+else
+
+	wget -O kernel-qemu https://github.com/polaco1782/raspberry-qemu/blob/master/kernel-qemu?raw=true
+
+fi
+
+echo " copying raspbian "
+cp raspbian.img ${PHANTOM_OUTPUT}
+
+echo " resizing to ${PHANTOM_SIZE} "
+qemu-img resize -f raw ${PHANTOM_OUTPUT} ${PHANTOM_SIZE}
+
+echo " checking partition information "
+
+PART_BOOT_START=$(parted ${PHANTOM_OUTPUT} -ms unit s print | grep "^1" | cut -f 2 -d: | cut -f 1 -ds)
+PART_ROOT_START=$(parted ${PHANTOM_OUTPUT} -ms unit s print | grep "^2" | cut -f 2 -d: | cut -f 1 -ds)
+echo $PART_BOOT_START $PART_ROOT_START
+
+echo " resizing using fdisk "
+fdisk ${PHANTOM_OUTPUT} <<EOF
+p
+d
+2
+n
+p
+2
+$PART_ROOT_START
+
+p
+w
+EOF
+
+
+#this tweaks the rasbpian system config files
+
+./box-mount
+
+echo " enable ssh "
+sudo tee boot/ssh >/dev/null <<EOF
+OK
+EOF
+sudo tee root/boot/ssh >/dev/null <<EOF
+OK
+EOF
+
+echo " setup boot config to 1080p with no overscan and a 64meg gfx card"
+sudo tee boot/config.txt >/dev/null <<EOF
+gpu_mem=64
+hdmi_force_hotplug=1
+hdmi_drive=2
+hdmi_group=1
+config_hdmi_boost=4
+#set 1080p with no overscan
+hdmi_mode=16
+disable_overscan=1
+EOF
+
+echo " disable console blank and raspi logo "
+sudo tee boot/cmdline.txt >/dev/null <<EOF
+dwc_otg.lpm_enable=0 console=ttyAMA0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait logo.nologo=1 consoleblank=0
+EOF
+
+#backup original fstab
+sudo cp root/etc/fstab root/etc/fstab.card
+
+#use this fstab for qemu booting
+sudo tee root/etc/fstab.qemu >/dev/null <<EOF
+proc             /proc           proc    defaults          0       0
+/dev/sda2        /               ext4    defaults,noatime  0       1
+EOF
+
+sudo tee root/etc/rc.local >/dev/null <<EOF
+#!/bin/sh -e
+# Print the IP address
+_IP="\$(hostname -I)" || true
+if [ "\$_IP" ]; then
+  printf "My IP address is %s\n" "\$_IP"
+fi
+#run simultaneously any /home/pi/*.boot.sh scripts we can find
+cd /home/pi/
+for f in *.boot.sh; do
+  bash "\${f}" >/dev/null &
+done
+exit 0
+EOF
+
+./box-umount
+
+
+echo "starting qemu but detaching it from this shell, wait until we can login before running the next script"
+./box-up &
+
+echo " copying your id_rsa.pub to the PIs authorised keys for auto login "
+ssh-keygen -f "$HOME/.ssh/known_hosts" -R [localhost]:5522
+while ! cat ~/.ssh/id_rsa.pub | sshpass -p raspberry ssh -oStrictHostKeyChecking=no -p 5522 pi@localhost " mkdir -p .ssh ; cat >> .ssh/authorized_keys "
+do
+	sleep 10
+    echo "Trying ssh login again..."
+done
+
+echo " apply final resize of partition "
+./ssh " sudo resize2fs /dev/sda2 "
+
+echo " set the name of this raspberry pi "
+./ssh " sudo hostnamectl set-hostname ${PHANTOM_NAME} "
+
+
+
+./box-down
+
+
