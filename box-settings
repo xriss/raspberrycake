@@ -4,7 +4,7 @@ PHANTOM_SIZE=3.6G
 
 
 # The hostname of the machine and filename of sd card image
-PHANTOM_NAME=raspocd
+PHANTOM_NAME=raspberrycake
 
 
 # The name of the output sd card image

@@ -133,6 +133,8 @@ echo " apply final resize of partition "
 echo " set the name of this raspberry pi "
 ./ssh " sudo hostnamectl set-hostname ${PHANTOM_NAME} "
 
+echo " installing snapd but we need to reboot before you can use it "
+./ssh " sudo apt install -y snapd "
 
 
 ./box-down
