@@ -3,8 +3,8 @@ cd `dirname $0`
 THISDIR=`dirname $0`
 
 #update these to get a newer version
-RASPBIAN_FILE=2019-04-08-raspbian-stretch-lite
-RASPBIAN_URL=https://downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-04-09/$RASPBIAN_FILE.zip
+RASPBIAN_FILE=2019-09-26-raspbian-buster-lite
+RASPBIAN_URL=https://downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-09-30/$RASPBIAN_FILE.zip
 
 
 if [ -f raspbian.img ] ; then
