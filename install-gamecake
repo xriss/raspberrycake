@@ -1,0 +1,12 @@
+cd `dirname $0`
+. ./box-settings
+
+
+./box-up-wait
+
+
+echo " installing gamecake "
+./ssh " sudo snap install gamecake "
+
+
+./box-down
